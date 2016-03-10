@@ -1,26 +1,39 @@
 import gmpy2
 import random
-from collections import namedtuple
+from typing import Tuple, List, Any, Iterator, Optional
+from .keyinfo import KeyInfo
 
 RANDOM = random.SystemRandom()
-KeyInfo = namedtuple("KeyInfo", "n e d p q")
 
 
 def randomOdd(bits: int) -> int:
-    """Returns a random odd number in [2**(bits - 1), 2**bits]."""
+    """Returns a random odd number in [2**(bits - 1), 2**bits].
+    :param bits: number of bits for the odd.
+    :type bits: int
+    :returns: a random odd of the specified length.
+    :rtype: int"""
     return RANDOM.randrange(1 << (bits - 1), (1 << bits) - 1)|1
 
 def find_prime(bits: int) -> int:
-    """Returns a prime number in [2**(bits - 1), 2**bits]."""
+    """Returns a prime number in [2**(bits - 1), 2**bits].
+    :param bits: number of bits for the prime.
+    :type bits: int
+    :returns: A prime with the given amount of bits.
+    :rtype: int"""
     p = randomOdd(bits)
     while not gmpy2.is_strong_bpsw_prp(p):
         p = randomOdd(bits)
     return p
 
 
-def is_good_pair(p: int, q: int) -> (int, int):
+def is_good_pair(p: int, q: int) -> Optional[Tuple[int, int]]:
     """Returns the encryption modulus and totient for the given primes.
-    If p and q are too close, returns None."""
+    :param p: One of the two primes to be used for encryption.
+    :type p: int
+    :param q: The other prime used for encryption.
+    :type q: int
+    :returns: Either the encryption modulus and the totient, or None.
+    :rtype: Optional[Tuple[int, int]]"""
     n = p*q
     k = gmpy2.ceil(gmpy2.log2(n))
     if abs(p - q) > 2**(k/2 - 100):
@@ -28,12 +41,12 @@ def is_good_pair(p: int, q: int) -> (int, int):
     return None
 
 
-def yield_pairs(a_list: []) -> [(...,...)]:
+def yield_pairs(a_list: List[Any]) -> Iterator[Tuple[Any,Any]]:
     """Yields every pair in the given list.
     :param a_list: a python list.
-    :type a_list: list
-    :return: a generator which yields each pair as a tuple.
-    :rtype: Generator[Tuple[...,...]]"""
+    :type a_list: List[Any]
+    :returns: a generator which yields each pair as a tuple.
+    :rtype: Iterator[Tuple[Any,Any]]"""
     for index, item in enumerate(a_list):
         for second_item in a_list[index+1:]:
             yield item, second_item
@@ -50,8 +63,9 @@ def get_key_info(bits: int, e: int = 3) -> KeyInfo:
     primes = [find_prime(bits), find_prime(bits)]
     bad_pairs = set()
     while True:
-        for p, q in yield_pairs(primes):
-            if (p, q) not in bad_pairs:
+        for pair in yield_pairs(primes):
+            if pair not in bad_pairs:
+                p, q = pair
                 if p < q:
                     p, q = q, p
 

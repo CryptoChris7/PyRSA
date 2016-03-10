@@ -2,6 +2,7 @@ from pyasn1.codec.der import encoder, decoder
 from pyasn1.type import univ, namedtype
 from base64 import b64encode, b64decode
 import gmpy2
+from .keyinfo import KeyInfo
 
 FIRST_LINE_PRIVATE = '-----BEGIN RSA PRIVATE KEY-----'
 LAST_LINE_PRIVATE = '-----END RSA PRIVATE KEY-----'
@@ -29,7 +30,7 @@ class RSAPrivateKey(univ.Sequence):
         namedtype.NamedType('coefficient', univ.Integer())
         )
 
-def format_key(encoded, priv):
+def format_key(encoded: str, priv: bool) -> str:
     if priv:
         first_line = FIRST_LINE_PRIVATE
         last_line = LAST_LINE_PRIVATE
@@ -46,26 +47,27 @@ def format_key(encoded, priv):
     formatted.append(last_line)
     return '\n'.join(formatted)
 
-def encode_public_key(key):
+def encode_public_key(key_info: KeyInfo) -> str:
     public_key = RSAPublicKey()
-    public_key.setComponentByName('modulus', key.n)
-    public_key.setComponentByName('publicExponent', key.e)
+    public_key.setComponentByName('modulus', key_info.n)
+    public_key.setComponentByName('publicExponent', key_info.e)
     return format_key(encoder.encode(public_key), False)
 
-def encode_private_key(key_info):
+def encode_private_key(key_info: KeyInfo) -> str:
     private_key = RSAPrivateKey()
     private_key.setComponentByName('version', 0)
-    private_key.setComponentByName('modulus', key.n)
-    private_key.setComponentByName('publicExponent', key.e)
-    private_key.setComponentByName('privateExponent', key.d)
-    private_key.setComponentByName('prime1', key.p)
-    private_key.setComponentByName('prime2', key.q)
-    private_key.setComponentByName('exponent1', key.d % (key.p - 1))
-    private_key.setComponentByName('exponent2', key.d % (key.q - 1))
-    private_key.setComponentByName('coefficient', gmpy2.invert(key.q, key.p))
+    private_key.setComponentByName('modulus', key_info.n)
+    private_key.setComponentByName('publicExponent', key_info.e)
+    private_key.setComponentByName('privateExponent', key_info.d)
+    private_key.setComponentByName('prime1', key_info.p)
+    private_key.setComponentByName('prime2', key_info.q)
+    private_key.setComponentByName('exponent1', key_info.d % (key_info.p - 1))
+    private_key.setComponentByName('exponent2', key_info.d % (key_info.q - 1))
+    private_key.setComponentByName('coefficient', gmpy2.invert(key_info.q, key_info.p))
     return format_key(encoder.encode(private_key), True)
 
-def decode_key(key):
+def decode_key(encoded_key: str) -> KeyInfo:
+    n, e, d, p, q = None, None, None, None, None
     b64_data = ''.join(key.split('\n')[1:-1])
     key_data = b64decode(b64_data)
 
@@ -85,14 +87,12 @@ def decode_key(key):
         d = parsed_key.getComponentByName('privateExponent')
         p = parsed_key.getComponentByName('prime1')
         q = parsed_key.getComponentByName('prime2')
-        return PrivateKey(*asn1_Ints_to_mpzs(n, e, d, p, q))
-    else:
-        return PublicKey(*asn1_Ints_to_mpzs(n, e))
+
+    return KeyInfo(n, e, d, p, q)
 
 if __name__ == '__main__':
-    import primes
-    priv, pub = primes.get_keys()
-    print encode_private_key(priv)
-    print encode_public_key(pub)
-    x = decode_key(encode_private_key(priv))
-    print x
+    from . import primes
+    key_info = primes.get_key_info()
+    print(encode_private_key(key_info))
+    print(encode_public_key(key_info))
+    print(decode_key(encode_private_key(key_info)))
