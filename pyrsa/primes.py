@@ -41,17 +41,6 @@ def is_good_pair(p: int, q: int) -> Optional[Tuple[int, int]]:
     return None
 
 
-def yield_pairs(a_list: List[Any]) -> Iterator[Tuple[Any,Any]]:
-    """Yields every pair in the given list.
-    :param a_list: a python list.
-    :type a_list: List[Any]
-    :returns: a generator which yields each pair as a tuple.
-    :rtype: Iterator[Tuple[Any,Any]]"""
-    for index, item in enumerate(a_list):
-        for second_item in a_list[index+1:]:
-            yield item, second_item
-
-
 def get_key_info(bits: int, e: int = 3) -> KeyInfo:
     """Finds parameters appropriate for RSA encryption.
     :param bits: the number of bits in the encryption modulus.
@@ -60,21 +49,19 @@ def get_key_info(bits: int, e: int = 3) -> KeyInfo:
     :type e: int
     :return: all the RSA parameters for the public and private keys.
     :rtype: KeyInfo"""
-    primes = [find_prime(bits), find_prime(bits)]
-    bad_pairs = set()
+    primes = [find_prime(bits/2)]
     while True:
-        for pair in yield_pairs(primes):
-            if pair not in bad_pairs:
-                p, q = pair
-                if p < q:
-                    p, q = q, p
+        newest_prime = find_prime(bits/2)
+        for prime in primes:
+            p, q = prime, newest_prime
+            if p < q:
+                p, q = q, p
+                
+            result = is_good_pair(p, q)
+            if result:
+                n, tot = result
+                if gmpy2.gcd(e, tot) == 1:
+                    d = gmpy2.invert(e, tot)
+                    return KeyInfo(n, e, d, p, q)
 
-                result = is_good_pair(p, q)
-                if result is not None:
-                    n, tot = result
-                    if gmpy2.gcd(e, tot) == 1:
-                        d = gmpy2.invert(e, tot)
-                        return KeyInfo(n, e, d, p, q)
-
-                bad_pairs.add(pair)
-        primes.append(find_prime(bits))
+        primes.append(newest_prime)
