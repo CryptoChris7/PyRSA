@@ -1,4 +1,5 @@
 #!/bin/bash
 
-sudo apt-get install libgmp-dev libmpfr-dev libmpc-dev
-sudo pip install gmpy2 pyasn1
+sudo apt update
+sudo apt install libgmp-dev libmpfr-dev libmpc-dev
+pip install gmpy2 pyasn1
