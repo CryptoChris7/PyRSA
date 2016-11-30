@@ -1,5 +1,6 @@
 from .keyinfo import KeyInfo
 import hashlib
+import os
 
 HASH = hashlib.sha256
 HASHLEN = 32

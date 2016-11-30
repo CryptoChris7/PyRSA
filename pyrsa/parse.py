@@ -3,23 +3,29 @@ from pyasn1.type import univ, namedtype
 from base64 import b64encode, b64decode
 import gmpy2
 from .keyinfo import KeyInfo
+from typing import Union
 
-FIRST_LINE_PRIVATE = '-----BEGIN RSA PRIVATE KEY-----'
-LAST_LINE_PRIVATE = '-----END RSA PRIVATE KEY-----'
+PRIVATE = b'''\
+-----BEGIN RSA PRIVATE KEY-----
+%b
+-----END RSA PRIVATE KEY-----
+'''
 
-FIRST_LINE_PUBLIC = '-----BEGIN RSA PUBLIC KEY-----'
-LAST_LINE_PUBLIC = '-----END RSA PUBLIC KEY-----'
+PUBLIC = b'''\
+-----BEGIN RSA PUBLIC KEY-----
+%b
+-----END RSA PUBLIC KEY-----
+'''
 
 
 # https://tools.ietf.org/html/rfc3447#appendix-A.1
-class RSAPublicKey(univ.Sequence):
+class PublicKey(univ.Sequence):
     componentType = namedtype.NamedTypes(
         namedtype.NamedType('modulus', univ.Integer()),
-        namedtype.NamedType('publicExponent', univ.Integer())
-        )
+        namedtype.NamedType('publicExponent', univ.Integer()))
 
 
-class RSAPrivateKey(univ.Sequence):
+class PrivateKey(univ.Sequence):
     componentType = namedtype.NamedTypes(
         namedtype.NamedType('version', univ.Integer()),
         namedtype.NamedType('modulus', univ.Integer()),
@@ -33,65 +39,63 @@ class RSAPrivateKey(univ.Sequence):
         )
 
 
-def format_key(encoded: str, priv: bool) -> str:
-    if priv:
-        first_line = FIRST_LINE_PRIVATE
-        last_line = LAST_LINE_PRIVATE
+def format_key(key: Union[PublicKey, PrivateKey]) -> bytes:
+    data_lines = []
+    b64_data = b64encode(encoder.encode(key))
+    start, stop = 0, 64
+
+    while start < len(b64_data):
+        data_lines.append(b64_data[start:stop])
+        start, stop = start + 64, stop + 64
+
+    if isinstance(key, PublicKey):
+        return PUBLIC % b'\n'.join(data_lines)
     else:
-        first_line = FIRST_LINE_PUBLIC
-        last_line = LAST_LINE_PUBLIC
-
-    formatted = [first_line]
-    b64_data = b64encode(encoded)
-    view = memoryview(b64_data)
-    while view:
-        chunk, view = view[:64].tobytes(), view[64:]
-        formatted.append(chunk)
-    formatted.append(last_line)
-    return '\n'.join(formatted)
+        return PRIVATE % b'\n'.join(data_lines)
 
 
-def encode_public_key(key_info: KeyInfo) -> str:
-    public_key = RSAPublicKey()
-    public_key.setComponentByName('modulus', key_info.n)
-    public_key.setComponentByName('publicExponent', key_info.e)
-    return format_key(encoder.encode(public_key), False)
+def encode_public_key(key_info: KeyInfo) -> bytes:
+    key = PublicKey()
+    key.setComponentByName('modulus', key_info.modulus)
+    key.setComponentByName('publicExponent', key_info.public_exponent)
+    return format_key(key)
 
 
-def encode_private_key(key_info: KeyInfo) -> str:
-    private_key = RSAPrivateKey()
-    private_key.setComponentByName('version', 0)
-    private_key.setComponentByName('modulus', key_info.n)
-    private_key.setComponentByName('publicExponent', key_info.e)
-    private_key.setComponentByName('privateExponent', key_info.d)
-    private_key.setComponentByName('prime1', key_info.p)
-    private_key.setComponentByName('prime2', key_info.q)
-    private_key.setComponentByName('exponent1', key_info.d % (key_info.p - 1))
-    private_key.setComponentByName('exponent2', key_info.d % (key_info.q - 1))
-    private_key.setComponentByName('coefficient', gmpy2.invert(key_info.q, key_info.p))
-    return format_key(encoder.encode(private_key), True)
+def encode_private_key(key_info: KeyInfo) -> bytes:
+    key = PrivateKey()
+    key.setComponentByName('version', 0)
+    key.setComponentByName('modulus', key_info.modulus)
+    key.setComponentByName('publicExponent', key_info.public_exponent)
+    key.setComponentByName('privateExponent', key_info.private_exponent)
+    key.setComponentByName('prime1', key_info.p)
+    key.setComponentByName('prime2', key_info.q)
+    key.setComponentByName('exponent1', key_info.private_exponent % (key_info.p - 1))
+    key.setComponentByName('exponent2', key_info.private_exponent % (key_info.q - 1))
+    key.setComponentByName('coefficient', gmpy2.invert(key_info.q, key_info.p))
+    return format_key(encoder.encode(key))
 
 
-def decode_key(encoded_key: str) -> KeyInfo:
-    n, e, d, p, q = None, None, None, None, None
-    b64_data = ''.join(key.split('\n')[1:-1])
+def decode_public_key(encoded_key: bytes) -> KeyInfo:
+    b64_data = b''.join(encoded_key.split(b'\n')[1:-2])
     key_data = b64decode(b64_data)
+    parsed_key = decoder.decode(key_data, asn1Spec=PublicKey())[0]
+    modulus = parsed_key.getComponentByName('modulus')
+    public_exponent = parsed_key.getComponentByName('publicExponent')
+    return KeyInfo(modulus,
+                   public_exponent,
+                   0, 0, 0)
 
-    private = 'PRIVATE' in key
 
-    if private:
-        spec = RSAPrivateKey
-    else:
-        spec = RSAPublicKey
-
-    parsed_key = decoder.decode(key_data, asn1Spec=spec())[0]
-
-    n = parsed_key.getComponentByName('modulus')
-    e = parsed_key.getComponentByName('publicExponent')
-
-    if private:
-        d = parsed_key.getComponentByName('privateExponent')
-        p = parsed_key.getComponentByName('prime1')
-        q = parsed_key.getComponentByName('prime2')
-
-    return KeyInfo(n, e, d, p, q)
+def decode_private_key(encoded_key: bytes) -> KeyInfo:
+    b64_data = b''.join(encoded_key.split(b'\n')[1:-2])
+    key_data = b64decode(b64_data)
+    parsed_key = decoder.decode(key_data, asn1Spec=PublicKey())[0]
+    modulus = parsed_key.getComponentByName('modulus')
+    public_exponent = parsed_key.getComponentByName('publicExponent')
+    private_exponent = parsed_key.getComponentByName('privateExponent')
+    p = parsed_key.getComponentByName('prime1')
+    q = parsed_key.getComponentByName('prime2')
+    return KeyInfo(modulus,
+                   public_exponent,
+                   private_exponent,
+                   p, q)

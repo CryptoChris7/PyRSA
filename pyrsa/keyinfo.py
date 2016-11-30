@@ -1,6 +1,5 @@
-
-
 class KeyInfo:
+    """Internal class for holding RSA key information"""
     __slots__ = ()
     modulus = 0  # type: int
     public_exponent = 0  # type: int
