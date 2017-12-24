@@ -1,7 +1,7 @@
 from pyasn1.codec.der import encoder, decoder
 from pyasn1.type import univ, namedtype
 from base64 import b64encode, b64decode
-import gmpy2
+from gmpy2 import invert
 from .keyinfo import KeyInfo
 from typing import Union
 
@@ -71,7 +71,7 @@ def encode_private_key(key_info: KeyInfo) -> bytes:
     key.setComponentByName('prime2', key_info.q)
     key.setComponentByName('exponent1', key_info.private_exponent % (key_info.p - 1))
     key.setComponentByName('exponent2', key_info.private_exponent % (key_info.q - 1))
-    key.setComponentByName('coefficient', gmpy2.invert(key_info.q, key_info.p))
+    key.setComponentByName('coefficient', invert(key_info.q, key_info.p))
     return format_key(encoder.encode(key))
 
 

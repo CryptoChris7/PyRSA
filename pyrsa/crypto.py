@@ -1,20 +1,21 @@
 from .keyinfo import KeyInfo
-import hashlib
-import os
+from hashlib import sha256
+from os import urandom
 
-HASH = hashlib.sha256
+HASH = sha256
 HASHLEN = 32
 
 
 def mask_generating_function(seed: bytes, length: int) -> bytes:
     iterations = length//HASHLEN
     result = bytearray()
-    for i in list(range(iterations)):
+    for i in range(iterations):
         result.extend(HASH(seed + i.to_bytes(4, 'big', signed=False)).digest())
     return bytes(result[:length])
 
 
 def xor(a: bytes, b: bytes) -> bytes:
+    assert len(a) == len(b), 'bytes must have same length!'
     return bytes(a_i ^ b_i for a_i, b_i in zip(a, b))
 
 
@@ -30,7 +31,7 @@ def encrypt(public_key: KeyInfo,
 
     zero_pad = bytes(modulus_length - message_length - 2*HASHLEN - 2)
     data_block = HASH(label).digest() + zero_pad + b'\x01' + message
-    seed = os.urandom(HASHLEN)
+    seed = urandom(HASHLEN)
     data_mask = mask_generating_function(seed, modulus_length - HASHLEN - 1)
     masked_data = xor(data_block, data_mask)
     seed_mask = mask_generating_function(masked_data, HASHLEN)
