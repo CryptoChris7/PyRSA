@@ -1,4 +1,4 @@
-from .keyinfo import KeyInfo
+from pyrsa.keyinfo import KeyInfo
 from hashlib import sha256
 from os import urandom
 

@@ -52,12 +52,8 @@ def check_pair(p: int, q: int) -> Tuple[int, int]:
     return 0, 0
 
 
-def generate_key(bits: int) -> KeyInfo:
+def generate_key(bits: int, public_exponent: int = 3) -> KeyInfo:
     """Finds parameters appropriate for RSA encryption."""
-    public_exponent = 3
-    # Note: if you don't use proper padding then 3 is way too small.
-    # Even with random padding, 3 is too small.
-    # You have to use OAEP!
     primes = []
     while True:
         q = find_prime(bits//2)

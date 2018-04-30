@@ -72,7 +72,7 @@ def encode_private_key(key_info: KeyInfo) -> bytes:
     key.setComponentByName('exponent1', key_info.private_exponent % (key_info.p - 1))
     key.setComponentByName('exponent2', key_info.private_exponent % (key_info.q - 1))
     key.setComponentByName('coefficient', invert(key_info.q, key_info.p))
-    return format_key(encoder.encode(key))
+    return format_key(key)
 
 
 def decode_public_key(encoded_key: bytes) -> KeyInfo:
